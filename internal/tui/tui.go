@@ -61,9 +61,10 @@ func NewModel(repo domain.TodoRepository) Model {
 		tabs: []tab{
 			{label: "Inbox", color: "#5f87d7", list: domain.ListInbox},
 			{label: "Today", color: "#d8a100", list: domain.ListToday},
-			{label: "Upcoming", color: "#d75f5f", list: domain.ListScheduled},
+			{label: "Scheduled", color: "#d75f5f", list: domain.ListScheduled},
 			{label: "Anytime", color: "#008b8b", list: domain.ListAnytime},
-			{label: "Logbook", color: "#666666", list: domain.ListLogbook},
+			{label: "Someday", color: "#af5fd7", list: domain.ListSomeday},
+			{label: "Archive", color: "#666666", list: domain.ListLogbook},
 		},
 		active:  1,
 		loading: true,
@@ -135,7 +136,7 @@ func (m Model) View() tea.View {
 	}
 
 	header := m.renderHeader()
-	footer := legendStyle.Render(m.keys.legend())
+	footer := legendStyle.Render(m.keys.legend(m.tabs[m.active].list == domain.ListLogbook))
 
 	v.Content = lipgloss.JoinVertical(lipgloss.Left,
 		header,

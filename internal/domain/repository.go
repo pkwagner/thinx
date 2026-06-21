@@ -9,6 +9,7 @@ const (
 	ListInbox
 	ListScheduled
 	ListAnytime
+	ListSomeday
 	ListLogbook
 )
 

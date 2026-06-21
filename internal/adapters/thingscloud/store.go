@@ -53,6 +53,8 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 		tasks, err = state.TasksInUpcoming(opts)
 	case domain.ListAnytime:
 		tasks, err = state.TasksInAnytime(opts)
+	case domain.ListSomeday:
+		tasks, err = state.TasksInSomeday(opts)
 	case domain.ListLogbook:
 		tasks, err = state.TasksInLogbook(opts)
 	default:
