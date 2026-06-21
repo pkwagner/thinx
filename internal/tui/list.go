@@ -4,12 +4,12 @@ import (
 	"fmt"
 	"io"
 	"strings"
-	"time"
 
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"thinx/internal/domain"
+	"thinx/internal/tui/uihelp"
 )
 
 type todoDelegate struct {
@@ -66,21 +66,17 @@ func todoDetails(todo domain.Todo, list domain.TodoList) string {
 		details = append(details, "#"+todo.Project)
 	}
 	if todo.DeadlineAt != nil {
-		details = append(details, "!"+formatDate(*todo.DeadlineAt))
+		details = append(details, "!"+uihelp.FormatDate(*todo.DeadlineAt))
 	}
 	switch list {
 	case domain.ListScheduled:
 		if todo.ScheduledAt != nil {
-			details = append(details, "@"+formatDate(*todo.ScheduledAt))
+			details = append(details, "@"+uihelp.FormatDate(*todo.ScheduledAt))
 		}
 	case domain.ListLogbook:
 		if todo.CheckedAt != nil {
-			details = append(details, "@"+formatDate(*todo.CheckedAt))
+			details = append(details, "@"+uihelp.FormatDate(*todo.CheckedAt))
 		}
 	}
 	return strings.Join(details, " ")
-}
-
-func formatDate(t time.Time) string {
-	return t.Format("2006-01-02")
 }

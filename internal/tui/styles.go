@@ -29,7 +29,5 @@ var (
 
 	selectedTodoDetailsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 
-	footerStyle = lipgloss.NewStyle().
-			Foreground(lipgloss.Color("8")).
-			Padding(0, 1)
+	legendStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 )

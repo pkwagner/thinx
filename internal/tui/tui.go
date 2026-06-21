@@ -9,6 +9,7 @@ import (
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
 	"thinx/internal/domain"
+	"thinx/internal/tui/modal"
 )
 
 type tab struct {
@@ -29,6 +30,7 @@ type Model struct {
 	tabs    []tab
 	list    list.Model
 	spinner spinner.Model
+	modal   *modal.Model
 	active  int
 	loading bool
 	err     error
@@ -96,10 +98,16 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
 	case tea.KeyPressMsg:
+		if m.modal != nil {
+			return m.updateModal(msg)
+		}
+
 		// TODO undefined behavior if switching tabs while loading
 		switch {
 		case key.Matches(msg, m.keys.quit):
 			return m, tea.Quit
+		case key.Matches(msg, m.keys.openTask):
+			return m.openModal(), nil
 		case key.Matches(msg, m.keys.previousList):
 			return m.switchTab(-1)
 		case key.Matches(msg, m.keys.nextList):
@@ -127,7 +135,7 @@ func (m Model) View() tea.View {
 	}
 
 	header := m.renderHeader()
-	footer := footerStyle.Width(m.width).Render(m.keys.legend())
+	footer := legendStyle.Render(m.keys.legend())
 
 	v.Content = lipgloss.JoinVertical(lipgloss.Left,
 		header,
@@ -136,6 +144,9 @@ func (m Model) View() tea.View {
 		"",
 		footer,
 	)
+	if m.modal != nil {
+		v.Content = m.modal.Overlay(v.Content)
+	}
 	return v
 }
 
@@ -143,14 +154,39 @@ func (m Model) resize(width, height int) tea.Model {
 	m.width = width
 	m.height = height
 	m.list.SetSize(width, max(0, height-4))
+	if m.modal != nil {
+		m.modal.SetSize(width, height)
+	}
 	return m
+}
+
+func (m Model) openModal() Model {
+	todo, ok := m.list.SelectedItem().(domain.Todo)
+	if !ok {
+		return m
+	}
+	m.modal = modal.New(todo, m.width, m.height)
+	return m
+}
+
+func (m Model) updateModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	m.modal, cmd = m.modal.Update(msg)
+	if m.modal == nil {
+		return m, cmd
+	}
+	if m.modal.TakeSaved() {
+		cmd = tea.Batch(cmd, m.list.SetItem(m.list.GlobalIndex(), m.modal.Todo()))
+	}
+	return m, cmd
 }
 
 func (m Model) switchTab(delta int) (tea.Model, tea.Cmd) {
 	m.active = (m.active + delta + len(m.tabs)) % len(m.tabs)
 	m.err = nil
+	m.loading = true
 	cmd := m.list.SetItems(nil)
-	return m, tea.Batch(cmd, loadTodos(m.repo, m.tabs[m.active].list, false))
+	return m, tea.Batch(cmd, loadTodos(m.repo, m.tabs[m.active].list, false), m.spinner.Tick)
 }
 
 // renderHeader renders tabs and sync status.

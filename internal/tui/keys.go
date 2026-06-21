@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"charm.land/bubbles/v2/key"
+	"thinx/internal/tui/uihelp"
 )
 
 type keyMap struct {
@@ -11,6 +12,7 @@ type keyMap struct {
 	nextList     key.Binding
 	previousTodo key.Binding
 	nextTodo     key.Binding
+	openTask     key.Binding
 	quit         key.Binding
 }
 
@@ -20,29 +22,17 @@ func newKeyMap() keyMap {
 		nextList:     key.NewBinding(key.WithKeys("l", "right"), key.WithHelp("l/→", "next list")),
 		previousTodo: key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("k/↑", "prev todo")),
 		nextTodo:     key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("j/↓", "next todo")),
+		openTask:     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open todo")),
 		quit:         key.NewBinding(key.WithKeys("q", "ctrl+c"), key.WithHelp("q", "quit")),
 	}
 }
 
 func (k keyMap) legend() string {
 	parts := []string{
-		multiBindingHelp("select list", k.previousList, k.nextList),
-		multiBindingHelp("select todo", k.previousTodo, k.nextTodo),
-		bindingHelp(k.quit),
+		uihelp.MultiBindingHelp("select list", k.previousList, k.nextList),
+		uihelp.MultiBindingHelp("select todo", k.previousTodo, k.nextTodo),
+		uihelp.BindingHelp(k.openTask),
+		uihelp.BindingHelp(k.quit),
 	}
 	return strings.Join(parts, "; ")
-}
-
-func bindingHelp(binding key.Binding) string {
-	help := binding.Help()
-	return help.Key + ": " + help.Desc
-}
-
-func multiBindingHelp(help string, bindings ...key.Binding) string {
-	keys := make([]string, len(bindings))
-	for i, b := range bindings {
-		keys[i] = b.Help().Key
-	}
-
-	return strings.Join(keys, "/") + ": " + help
 }
