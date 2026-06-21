@@ -185,13 +185,14 @@ func (m *Model) legend() string {
 	}
 	if m.todo.Status == domain.TodoStatusOpen {
 		return strings.Join([]string{
-			uihelp.MultiBindingHelp("edit field", m.keys.editTitle, m.keys.editScheduled, m.keys.editDeadline, m.keys.editNote),
-			uihelp.MultiBindingHelp("schedule", m.keys.scheduleToday, m.keys.scheduleInbox, m.keys.scheduleSomeday),
+			uihelp.MultiBindingHelp("edit", m.keys.editTitle, m.keys.editScheduled, m.keys.editDeadline, m.keys.editNote),
+			uihelp.MultiBindingHelp("schedule", m.keys.scheduleToday, m.keys.scheduleInbox, m.keys.scheduleAnytime),
+			uihelp.MultiBindingHelp("clear", m.keys.scheduleSomeday, m.keys.clearDeadline),
 			uihelp.BindingHelp(m.keys.close),
 		}, "; ")
 	}
 	return strings.Join([]string{
-		uihelp.MultiBindingHelp("edit field", m.keys.editTitle, m.keys.editNote),
+		uihelp.MultiBindingHelp("edit", m.keys.editTitle, m.keys.editNote),
 		uihelp.BindingHelp(m.keys.close),
 	}, "; ")
 }
@@ -201,12 +202,13 @@ func (m *Model) scheduledHint() string {
 		m.keys.editScheduled.Help().Key,
 		m.keys.scheduleToday.Help().Key,
 		m.keys.scheduleInbox.Help().Key,
+		m.keys.scheduleAnytime.Help().Key,
 		m.keys.scheduleSomeday.Help().Key,
 	}, "/")
 }
 
 func (m *Model) deadlineHint() string {
-	return m.keys.editDeadline.Help().Key
+	return strings.Join([]string{m.keys.editDeadline.Help().Key, m.keys.clearDeadline.Help().Key}, "/")
 }
 
 // outerWidth is the total width of the bordered box.

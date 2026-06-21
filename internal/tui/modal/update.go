@@ -56,9 +56,18 @@ func (m *Model) updateNormal(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 			m.todo.ScheduledAt = nil
 			m.saved = true
 			return m, nil
+		case key.Matches(msg, m.keys.scheduleAnytime):
+			m.todo.Schedule = domain.TodoScheduleAnytime
+			m.todo.ScheduledAt = nil
+			m.saved = true
+			return m, nil
 		case key.Matches(msg, m.keys.scheduleSomeday):
 			m.todo.Schedule = domain.TodoScheduleSomeday
 			m.todo.ScheduledAt = nil
+			m.saved = true
+			return m, nil
+		case key.Matches(msg, m.keys.clearDeadline):
+			m.todo.DeadlineAt = nil
 			m.saved = true
 			return m, nil
 		case key.Matches(msg, m.keys.editScheduled):
@@ -120,7 +129,9 @@ func (m *Model) updateDateEdit(msg tea.KeyPressMsg, input *textinput.Model) (*Mo
 		switch m.editing {
 		case fieldScheduled:
 			m.todo.ScheduledAt = t
-			if t != nil && m.todo.Schedule == domain.TodoScheduleInbox {
+			if t == nil {
+				m.todo.Schedule = domain.TodoScheduleSomeday
+			} else if m.todo.Schedule == domain.TodoScheduleInbox {
 				m.todo.Schedule = domain.TodoScheduleAnytime
 			}
 		case fieldDeadline:
