@@ -4,6 +4,8 @@ bin/
 *.dll
 *.so
 *.dylib
+/thinx
+/main
 
 # Go build/test artifacts
 *.test
