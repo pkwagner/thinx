@@ -3,11 +3,11 @@ package tui
 import (
 	"context"
 
-	"github.com/charmbracelet/bubbles/key"
-	"github.com/charmbracelet/bubbles/list"
-	"github.com/charmbracelet/bubbles/spinner"
-	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/lipgloss"
+	"charm.land/bubbles/v2/key"
+	"charm.land/bubbles/v2/list"
+	"charm.land/bubbles/v2/spinner"
+	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 	"thinx/internal/domain"
 )
 
@@ -95,7 +95,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		var cmd tea.Cmd
 		m.spinner, cmd = m.spinner.Update(msg)
 		return m, cmd
-	case tea.KeyMsg:
+	case tea.KeyPressMsg:
 		// TODO undefined behavior if switching tabs while loading
 		switch {
 		case key.Matches(msg, m.keys.quit):
@@ -117,21 +117,26 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // View renders the complete terminal screen.
-func (m Model) View() string {
+func (m Model) View() tea.View {
+	var v tea.View
+	v.AltScreen = true
+
 	if m.width < 70 || m.height < 5 {
-		return errorStyle.Render("That's a pretty small terminal. Try resizing it?")
+		v.Content = errorStyle.Render("That's a pretty small terminal. Try resizing it?")
+		return v
 	}
 
 	header := m.renderHeader()
 	footer := footerStyle.Width(m.width).Render(m.keys.legend())
 
-	return lipgloss.JoinVertical(lipgloss.Left,
+	v.Content = lipgloss.JoinVertical(lipgloss.Left,
 		header,
 		"",
 		m.list.View(),
 		"",
 		footer,
 	)
+	return v
 }
 
 func (m Model) resize(width, height int) tea.Model {
