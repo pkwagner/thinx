@@ -76,21 +76,65 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 			return nil, err
 		}
 
-		checkedAt := task.CompletionDate
-		if checkedAt == nil && task.Status == things.TaskStatusCanceled {
-			checkedAt = task.ModificationDate
+		checklist, err := checklistItems(state, task.UUID)
+		if err != nil {
+			return nil, err
 		}
 
 		todos = append(todos, domain.Todo{
 			ID:          task.UUID,
 			Title:       task.Title,
+			Status:      mapStatus(task.Status),
+			Schedule:    mapSchedule(task.Schedule),
 			Project:     project,
+			Note:        task.Note,
+			Checklist:   checklist,
 			ScheduledAt: task.ScheduledDate,
 			DeadlineAt:  task.DeadlineDate,
-			CheckedAt:   checkedAt,
+			CheckedAt:   task.CompletionDate,
 		})
 	}
 	return todos, nil
+}
+
+func checklistItems(state *thingssync.State, taskUUID string) ([]domain.ChecklistItem, error) {
+	raw, err := state.ChecklistItems(taskUUID)
+	if err != nil {
+		return nil, err
+	}
+	items := make([]domain.ChecklistItem, 0, len(raw))
+	for _, item := range raw {
+		if item == nil {
+			continue
+		}
+		items = append(items, domain.ChecklistItem{
+			Title:     item.Title,
+			Completed: item.Status == things.TaskStatusCompleted,
+		})
+	}
+	return items, nil
+}
+
+func mapSchedule(s things.TaskSchedule) domain.TodoSchedule {
+	switch s {
+	case things.TaskScheduleAnytime:
+		return domain.TodoScheduleAnytime
+	case things.TaskScheduleSomeday:
+		return domain.TodoScheduleSomeday
+	default:
+		return domain.TodoScheduleInbox
+	}
+}
+
+func mapStatus(s things.TaskStatus) domain.TodoStatus {
+	switch s {
+	case things.TaskStatusCompleted:
+		return domain.TodoStatusCompleted
+	case things.TaskStatusCanceled:
+		return domain.TodoStatusCanceled
+	default:
+		return domain.TodoStatusOpen
+	}
 }
 
 func projectTitle(state *thingssync.State, cache map[string]string, task *things.Task) (string, error) {
