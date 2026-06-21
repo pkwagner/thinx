@@ -4,7 +4,7 @@ import "charm.land/lipgloss/v2"
 
 var (
 	inactiveTabStyle = lipgloss.NewStyle().
-				Foreground(lipgloss.Color("8")).
+				Foreground(lipgloss.Color("#888888")).
 				Padding(0, 2).
 				Margin(0, 1)
 
