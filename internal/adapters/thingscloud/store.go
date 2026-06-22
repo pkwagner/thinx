@@ -2,7 +2,10 @@ package thingscloud
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"sync"
+	"time"
 
 	things "github.com/arthursoares/things-cloud-sdk"
 	thingssync "github.com/arthursoares/things-cloud-sdk/sync"
@@ -11,6 +14,7 @@ import (
 
 type Store struct {
 	syncer *thingssync.Syncer
+	mu     sync.Mutex
 }
 
 // NewStore opens the Things Cloud-backed persistent store.
@@ -33,10 +37,11 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	var syncErr error
 	if forceSync {
-		if _, err := s.syncer.Sync(); err != nil {
-			return nil, err
-		}
+		_, syncErr = s.syncer.Sync()
 	}
 
 	state := s.syncer.State()
@@ -61,7 +66,7 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 		return nil, fmt.Errorf("unknown todo list %d", filter.List)
 	}
 	if err != nil {
-		return nil, err
+		return nil, errors.Join(syncErr, err)
 	}
 
 	projectTitlesCache := map[string]string{}
@@ -75,12 +80,12 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 		}
 		project, err := projectTitle(state, projectTitlesCache, task)
 		if err != nil {
-			return nil, err
+			return nil, errors.Join(syncErr, err)
 		}
 
 		checklist, err := checklistItems(state, task.UUID)
 		if err != nil {
-			return nil, err
+			return nil, errors.Join(syncErr, err)
 		}
 
 		todos = append(todos, domain.Todo{
@@ -96,7 +101,7 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 			CheckedAt:   task.CompletionDate,
 		})
 	}
-	return todos, nil
+	return todos, syncErr
 }
 
 func checklistItems(state *thingssync.State, taskUUID string) ([]domain.ChecklistItem, error) {
