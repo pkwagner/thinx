@@ -30,7 +30,6 @@ type Model struct {
 	todo           domain.Todo
 	keys           keyMap
 	editing        field
-	saved          bool
 	titleInput     textinput.Model
 	scheduledInput textinput.Model
 	deadlineInput  textinput.Model
@@ -72,13 +71,6 @@ func newDateInput() textinput.Model {
 
 // Todo returns the (possibly edited) task.
 func (m *Model) Todo() domain.Todo { return m.todo }
-
-// TakeSaved reports whether the todo changed since the last call and resets the flag.
-func (m *Model) TakeSaved() bool {
-	saved := m.saved
-	m.saved = false
-	return saved
-}
 
 // SetSize stores the terminal size and reflows all inputs.
 func (m *Model) SetSize(width, height int) {

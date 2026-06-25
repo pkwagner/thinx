@@ -49,26 +49,21 @@ func (m *Model) updateNormal(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 			today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
 			m.todo.Schedule = domain.TodoScheduleAnytime
 			m.todo.ScheduledAt = &today
-			m.saved = true
 			return m, nil
 		case key.Matches(msg, m.keys.scheduleInbox):
 			m.todo.Schedule = domain.TodoScheduleInbox
 			m.todo.ScheduledAt = nil
-			m.saved = true
 			return m, nil
 		case key.Matches(msg, m.keys.scheduleAnytime):
 			m.todo.Schedule = domain.TodoScheduleAnytime
 			m.todo.ScheduledAt = nil
-			m.saved = true
 			return m, nil
 		case key.Matches(msg, m.keys.scheduleSomeday):
 			m.todo.Schedule = domain.TodoScheduleSomeday
 			m.todo.ScheduledAt = nil
-			m.saved = true
 			return m, nil
 		case key.Matches(msg, m.keys.clearDeadline):
 			m.todo.DeadlineAt = nil
-			m.saved = true
 			return m, nil
 		case key.Matches(msg, m.keys.editScheduled):
 			m.editing = fieldScheduled
@@ -99,7 +94,6 @@ func (m *Model) updateTitleEdit(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 		m.todo.Title = strings.TrimSpace(m.titleInput.Value())
 		m.editing = fieldNone
 		m.titleInput.Blur()
-		m.saved = true
 		return m, nil
 	case key.Matches(msg, m.keys.cancel):
 		m.editing = fieldNone
@@ -139,7 +133,6 @@ func (m *Model) updateDateEdit(msg tea.KeyPressMsg, input *textinput.Model) (*Mo
 		}
 		m.editing = fieldNone
 		input.Blur()
-		m.saved = true
 		return m, nil
 	}
 	var cmd tea.Cmd
@@ -160,7 +153,6 @@ func (m *Model) updateNoteEdit(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 		m.todo.Note = strings.TrimRight(m.noteInput.Value(), "\n")
 		m.editing = fieldNone
 		m.noteInput.Blur()
-		m.saved = true
 		return m, nil
 	}
 	var cmd tea.Cmd

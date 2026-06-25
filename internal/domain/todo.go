@@ -43,3 +43,20 @@ type Todo struct {
 func (t Todo) FilterValue() string {
 	return t.Title
 }
+
+// SameEditableFields reports whether modal-editable fields are equal.
+func (t Todo) SameEditableFields(other Todo) bool {
+	return t.Title == other.Title &&
+		t.Note == other.Note &&
+		t.Schedule == other.Schedule &&
+		SameTime(t.ScheduledAt, other.ScheduledAt) &&
+		SameTime(t.DeadlineAt, other.DeadlineAt)
+}
+
+// SameTime reports whether two optional timestamps are equal.
+func SameTime(a, b *time.Time) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(*b)
+}

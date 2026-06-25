@@ -13,7 +13,8 @@ import (
 )
 
 type todoDelegate struct {
-	list domain.TodoList
+	list    domain.TodoList
+	pending map[string]bool // todo ID -> deletion pending (render struck through)
 }
 
 func (todoDelegate) Height() int { return 1 }
@@ -30,26 +31,55 @@ func (d todoDelegate) Render(w io.Writer, m list.Model, index int, item list.Ite
 
 	// Show cursor for active item
 	prefix := "  "
-	style := todoStyle
-	if index == m.Index() {
+	deleting := d.pending[todo.ID]
+	prefixStyle := todoStyle
+	titleStyle := todoStatusStyle(todo.Status, deleting).UnsetPaddingLeft()
+	selected := index == m.Index()
+	if selected {
 		prefix = "│ "
-		style = selectedTodoStyle
+		prefixStyle = prefixStyle.Bold(true)
+		titleStyle = titleStyle.Bold(true)
 	}
 
-	title := style.Render(prefix + todo.Title)
+	title := prefixStyle.Render(prefix) + titleStyle.Render(todo.Title)
 
 	details := todoDetails(todo, d.list)
-	detailsStyle := todoDetailsStyle
-	if index == m.Index() {
-		detailsStyle = selectedTodoDetailsStyle
-	}
-	details = detailsStyle.Render(details)
+	details = todoDetailsRenderStyle(selected, deleting).Render(details)
 
 	fmt.Fprint(w, lipgloss.JoinHorizontal(
 		lipgloss.Top,
 		lipgloss.PlaceHorizontal(m.Width()-lipgloss.Width(details), lipgloss.Left, title),
 		details,
 	))
+}
+
+// todoDetailsRenderStyle returns the status-neutral details style.
+func todoDetailsRenderStyle(selected, deleting bool) lipgloss.Style {
+	style := todoDetailsStyle
+	if selected {
+		style = selectedTodoDetailsStyle
+	}
+	if deleting {
+		style = style.Strikethrough(true)
+	}
+	return style
+}
+
+// todoStatusStyle returns the title style for a todo's current UI state.
+func todoStatusStyle(status domain.TodoStatus, deleting bool) lipgloss.Style {
+	var style lipgloss.Style
+	switch status {
+	case domain.TodoStatusCompleted:
+		style = completedTodoStyle
+	case domain.TodoStatusCanceled:
+		style = canceledTodoStyle
+	default:
+		style = todoStyle
+	}
+	if deleting {
+		style = style.Strikethrough(true)
+	}
+	return style
 }
 
 func todoItems(todos []domain.Todo) []list.Item {

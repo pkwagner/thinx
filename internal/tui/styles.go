@@ -23,7 +23,8 @@ var (
 
 	todoStyle = lipgloss.NewStyle().PaddingLeft(1)
 
-	selectedTodoStyle = todoStyle.Bold(true)
+	completedTodoStyle = todoStyle.Foreground(lipgloss.Color("2"))
+	canceledTodoStyle  = todoStyle.Foreground(lipgloss.Color("1"))
 
 	todoDetailsStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
 
