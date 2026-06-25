@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"sync"
-	"time"
 
 	things "github.com/arthursoares/things-cloud-sdk"
 	thingssync "github.com/arthursoares/things-cloud-sdk/sync"
@@ -104,6 +103,69 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 	return todos, syncErr
 }
 
+// Update persists changed modal-editable fields to Things Cloud.
+func (s *Store) Update(ctx context.Context, before, after domain.Todo) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	update := thingssync.TaskUpdate{}
+	if before.Title != after.Title {
+		update.Title = &after.Title
+	}
+	if before.Note != after.Note {
+		update.Note = &after.Note
+	}
+	if before.Schedule != after.Schedule || !domain.SameTime(before.ScheduledAt, after.ScheduledAt) {
+		schedule := mapDomainSchedule(after.Schedule)
+		update.Scheduling = &thingssync.TaskScheduling{
+			Schedule: schedule,
+			Date:     after.ScheduledAt,
+		}
+	}
+	if !domain.SameTime(before.DeadlineAt, after.DeadlineAt) {
+		update.DeadlineSet = true
+		update.Deadline = after.DeadlineAt
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.syncer.UpdateTask(after.ID, update)
+}
+
+// SetStatus persists a todo's completion state to Things Cloud.
+func (s *Store) SetStatus(ctx context.Context, id string, status domain.TodoStatus) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	var sdkStatus things.TaskStatus
+	switch status {
+	case domain.TodoStatusOpen:
+		sdkStatus = things.TaskStatusPending
+	case domain.TodoStatusCompleted:
+		sdkStatus = things.TaskStatusCompleted
+	case domain.TodoStatusCanceled:
+		sdkStatus = things.TaskStatusCanceled
+	default:
+		return fmt.Errorf("unsupported todo status %d", status)
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.syncer.SetTaskStatus(id, sdkStatus)
+}
+
+// Delete moves a todo to the Things trash.
+func (s *Store) Delete(ctx context.Context, id string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return s.syncer.TrashTask(id)
+}
+
 func checklistItems(state *thingssync.State, taskUUID string) ([]domain.ChecklistItem, error) {
 	raw, err := state.ChecklistItems(taskUUID)
 	if err != nil {
@@ -130,6 +192,18 @@ func mapSchedule(s things.TaskSchedule) domain.TodoSchedule {
 		return domain.TodoScheduleSomeday
 	default:
 		return domain.TodoScheduleInbox
+	}
+}
+
+// mapDomainSchedule converts a domain schedule to its SDK value.
+func mapDomainSchedule(s domain.TodoSchedule) things.TaskSchedule {
+	switch s {
+	case domain.TodoScheduleAnytime:
+		return things.TaskScheduleAnytime
+	case domain.TodoScheduleSomeday:
+		return things.TaskScheduleSomeday
+	default:
+		return things.TaskScheduleInbox
 	}
 }
 
