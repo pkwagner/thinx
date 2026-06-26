@@ -1,6 +1,8 @@
 package tui
 
 import (
+	"time"
+
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/list"
 	"charm.land/bubbles/v2/spinner"
@@ -10,6 +12,10 @@ import (
 	"thinx/internal/tui/modal"
 )
 
+// autoRefreshInterval is the minimum time between server syncs and the period of
+// the background heartbeat that keeps a focused, idle list current.
+const autoRefreshInterval = 30 * time.Second
+
 type tab struct {
 	label string
 	color string
@@ -17,10 +23,14 @@ type tab struct {
 }
 
 type todosLoadedMsg struct {
-	list  domain.TodoList
-	todos []domain.Todo
-	err   error
+	list   domain.TodoList
+	todos  []domain.Todo
+	synced bool // the load performed a server sync (forceSync)
+	err    error
 }
+
+// heartbeatMsg fires on the periodic timer that drives idle auto-refresh.
+type heartbeatMsg struct{}
 
 // mutationDoneMsg carries the reloaded list after a status or delete write that
 // has also been shown for its minimum display time.
@@ -44,6 +54,8 @@ type Model struct {
 	err           error
 	width         int
 	height        int
+	focused       bool      // terminal focus; gates auto-refresh
+	lastSync      time.Time // when the last server sync completed
 	// pending holds todos with an in-flight status/delete write, mapped to
 	// whether that write is a deletion (rendered struck through until reload).
 	pending map[string]bool
@@ -79,14 +91,15 @@ func NewModel(repo domain.TodoRepository) Model {
 			{label: "Archive", color: "#666666", list: domain.ListLogbook},
 		},
 		active:   1,
-		cloudOps: 1, // initial load kicked off by Init
+		cloudOps: 1,    // initial load kicked off by Init
+		focused:  true, // assume focused until told otherwise
 		pending:  pending,
 	}
 }
 
 // Init returns the initial Bubble Tea command.
 func (m Model) Init() tea.Cmd {
-	return tea.Batch(loadTodos(m.repo, m.tabs[m.active].list, true), m.spinner.Tick)
+	return tea.Batch(loadTodos(m.repo, m.tabs[m.active].list, true), m.spinner.Tick, heartbeat())
 }
 
 // Update applies terminal events to the model.
@@ -96,14 +109,33 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m.resize(msg.Width, msg.Height), nil
 	case todosLoadedMsg:
 		m.cloudOps--
+		if msg.synced {
+			// Record the attempt regardless of error so a failing sync doesn't
+			// re-trigger every 30s; the manual `r` key overrides the window.
+			m.lastSync = time.Now()
+		}
 		if msg.list != m.tabs[m.active].list {
 			return m, nil
 		}
 		m.err = msg.err
 		m.list.SetDelegate(todoDelegate{list: msg.list, pending: m.pending})
+		// Preserve the cursor: tab-switch/initial/`r` clear the list first (so
+		// index is 0 → top), a quiet background refresh keeps the real position.
+		index := m.list.Index()
 		cmd := m.list.SetItems(todoItems(msg.todos))
-		m.list.Select(0)
+		if len(msg.todos) > 0 {
+			m.list.Select(min(index, len(msg.todos)-1))
+		}
 		return m, cmd
+	case tea.FocusMsg:
+		m.focused = true
+		return m.maybeAutoRefresh()
+	case tea.BlurMsg:
+		m.focused = false
+		return m, nil
+	case heartbeatMsg:
+		next, cmd := m.maybeAutoRefresh()
+		return next, tea.Batch(cmd, heartbeat())
 	case spinner.TickMsg:
 		if m.cloudOps == 0 {
 			return m, nil
@@ -149,7 +181,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case key.Matches(msg, m.keys.deleteTodo):
 			return m.deleteTodo()
 		case key.Matches(msg, m.keys.refresh):
-			return m.startRefresh()
+			if m.cloudOps > 0 {
+				return m, nil
+			}
+			return m.backgroundRefresh()
 		case key.Matches(msg, m.keys.previousList):
 			return m.switchTab(-1)
 		case key.Matches(msg, m.keys.nextList):
@@ -225,6 +260,7 @@ func (m *Model) beginCloudOperation() tea.Cmd {
 func (m Model) View() tea.View {
 	var v tea.View
 	v.AltScreen = true
+	v.ReportFocus = true // deliver tea.FocusMsg/tea.BlurMsg for auto-refresh gating
 
 	if m.width < 70 || m.height < 5 {
 		v.Content = errorStyle.Render("That's a pretty small terminal. Try resizing it?")
@@ -298,19 +334,40 @@ func (m Model) updateModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
 	)
 }
 
-func (m Model) startRefresh() (tea.Model, tea.Cmd) {
+// shouldSync reports whether a server sync is currently warranted: the terminal
+// is focused, no modal is open, nothing else is in flight, and the rate-limit
+// window has elapsed.
+func (m Model) shouldSync() bool {
+	return m.focused && m.modal == nil && m.cloudOps == 0 &&
+		time.Since(m.lastSync) >= (autoRefreshInterval-time.Second)
+}
+
+// backgroundRefresh quietly pulls fresh data for the current tab. It does not
+// clear the list, so the current items and cursor stay until fresh data swaps
+// in. Shared by the `r` key, focus-gain, and the heartbeat.
+func (m Model) backgroundRefresh() (tea.Model, tea.Cmd) {
 	m.err = nil
-	cmd := m.list.SetItems(nil)
 	spinnerCmd := m.beginCloudOperation()
-	return m, tea.Batch(cmd, loadTodos(m.repo, m.tabs[m.active].list, true), spinnerCmd)
+	return m, tea.Batch(loadTodos(m.repo, m.tabs[m.active].list, true), spinnerCmd)
+}
+
+// maybeAutoRefresh refreshes only when the gate allows it.
+func (m Model) maybeAutoRefresh() (tea.Model, tea.Cmd) {
+	if !m.shouldSync() {
+		return m, nil
+	}
+	return m.backgroundRefresh()
 }
 
 func (m Model) switchTab(delta int) (tea.Model, tea.Cmd) {
 	m.active = (m.active + delta + len(m.tabs)) % len(m.tabs)
 	m.err = nil
+	// A stale switch doubles as the server sync; a fresh one is an instant local read.
+	forceSync := m.shouldSync()
 	cmd := m.list.SetItems(nil)
 	spinnerCmd := m.beginCloudOperation()
-	return m, tea.Batch(cmd, loadTodos(m.repo, m.tabs[m.active].list, false), spinnerCmd)
+	// TODO: Make this two calls, one for showing the cache and the other for syncing in the background
+	return m, tea.Batch(cmd, loadTodos(m.repo, m.tabs[m.active].list, forceSync), spinnerCmd)
 }
 
 // renderHeader renders tabs and sync status.

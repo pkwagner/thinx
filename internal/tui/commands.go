@@ -17,8 +17,13 @@ var mutationDisplay = time.Second
 func loadTodos(repo domain.TodoRepository, list domain.TodoList, forceSync bool) tea.Cmd {
 	return func() tea.Msg {
 		todos, err := repo.List(context.Background(), domain.TodoFilter{List: list}, forceSync)
-		return todosLoadedMsg{list: list, todos: todos, err: err}
+		return todosLoadedMsg{list: list, todos: todos, synced: forceSync, err: err}
 	}
+}
+
+// heartbeat schedules the periodic tick that drives idle auto-refresh.
+func heartbeat() tea.Cmd {
+	return tea.Tick(autoRefreshInterval, func(time.Time) tea.Msg { return heartbeatMsg{} })
 }
 
 // saveStatusAndReload persists a status change, then reloads the list.

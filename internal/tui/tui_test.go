@@ -274,3 +274,207 @@ func TestSaveStatusAndReload(t *testing.T) {
 		t.Fatalf("saved (%q, %v), want (one, canceled)", repo.id, repo.status)
 	}
 }
+
+// loadedModel returns an idle, focused model with one todo, as if a load finished.
+func loadedModel(repo domain.TodoRepository) Model {
+	m := NewModel(repo)
+	m.cloudOps = 0
+	m.list.SetItems(todoItems([]domain.Todo{{ID: "one", Title: "One"}}))
+	return m
+}
+
+// TestShouldSync covers the auto-refresh gate.
+func TestShouldSync(t *testing.T) {
+	t.Parallel()
+	stale := time.Now().Add(-2 * autoRefreshInterval)
+	base := loadedModel(&statusRepository{})
+	base.focused = true
+	base.lastSync = stale
+
+	if !base.shouldSync() {
+		t.Fatal("focused idle stale model should sync")
+	}
+
+	fresh := base
+	fresh.lastSync = time.Now()
+	if fresh.shouldSync() {
+		t.Fatal("recently synced model should not sync")
+	}
+
+	blurred := base
+	blurred.focused = false
+	if blurred.shouldSync() {
+		t.Fatal("blurred model should not sync")
+	}
+
+	busy := base
+	busy.cloudOps = 1
+	if busy.shouldSync() {
+		t.Fatal("busy model should not sync")
+	}
+
+	withModal := base
+	withModal = withModal.openModal()
+	if withModal.shouldSync() {
+		t.Fatal("model with open modal should not sync")
+	}
+}
+
+// TestLoadTodosSetsSyncedFlag verifies forceSync is reported back on the message.
+func TestLoadTodosSetsSyncedFlag(t *testing.T) {
+	t.Parallel()
+	repo := &statusRepository{}
+	if msg := loadTodos(repo, domain.ListToday, true)().(todosLoadedMsg); !msg.synced {
+		t.Fatal("forceSync load should report synced=true")
+	}
+	if msg := loadTodos(repo, domain.ListToday, false)().(todosLoadedMsg); msg.synced {
+		t.Fatal("local load should report synced=false")
+	}
+}
+
+// TestFocusTriggersRefreshWhenStale verifies regaining focus refreshes a stale list.
+func TestFocusTriggersRefreshWhenStale(t *testing.T) {
+	t.Parallel()
+	m := loadedModel(&statusRepository{})
+	m.focused = false // lastSync stays zero → stale
+
+	next, _ := m.Update(tea.FocusMsg{})
+	m = next.(Model)
+	if !m.focused || m.cloudOps != 1 {
+		t.Fatalf("focus refresh: focused=%v cloudOps=%d", m.focused, m.cloudOps)
+	}
+}
+
+// TestFocusDoesNotRefreshWhenFresh verifies the rate-limit window blocks refresh.
+func TestFocusDoesNotRefreshWhenFresh(t *testing.T) {
+	t.Parallel()
+	m := loadedModel(&statusRepository{})
+	m.lastSync = time.Now()
+
+	next, _ := m.Update(tea.FocusMsg{})
+	m = next.(Model)
+	if m.cloudOps != 0 {
+		t.Fatalf("fresh focus should not refresh: cloudOps=%d", m.cloudOps)
+	}
+}
+
+// TestBlurBlocksHeartbeatRefresh verifies a blurred terminal never syncs, but the
+// heartbeat keeps ticking.
+func TestBlurBlocksHeartbeatRefresh(t *testing.T) {
+	t.Parallel()
+	m := loadedModel(&statusRepository{})
+
+	next, _ := m.Update(tea.BlurMsg{})
+	m = next.(Model)
+	if m.focused {
+		t.Fatal("blur did not clear focus")
+	}
+
+	next, cmd := m.Update(heartbeatMsg{})
+	m = next.(Model)
+	if m.cloudOps != 0 {
+		t.Fatalf("blurred heartbeat should not refresh: cloudOps=%d", m.cloudOps)
+	}
+	if cmd == nil {
+		t.Fatal("heartbeat should re-arm itself even when blurred")
+	}
+}
+
+// TestHeartbeatRefreshesAndRearms verifies the periodic tick refreshes when idle
+// and stale, and reschedules itself.
+func TestHeartbeatRefreshesAndRearms(t *testing.T) {
+	t.Parallel()
+	m := loadedModel(&statusRepository{}) // focused, lastSync zero → stale
+
+	next, cmd := m.Update(heartbeatMsg{})
+	m = next.(Model)
+	if m.cloudOps != 1 {
+		t.Fatalf("idle heartbeat should refresh: cloudOps=%d", m.cloudOps)
+	}
+	if cmd == nil {
+		t.Fatal("heartbeat should re-arm itself")
+	}
+}
+
+// TestHeartbeatBlockedByModal verifies an open modal suppresses auto-refresh.
+func TestHeartbeatBlockedByModal(t *testing.T) {
+	t.Parallel()
+	m := loadedModel(&statusRepository{})
+	m.list.Select(0)
+	m = m.openModal()
+
+	next, _ := m.Update(heartbeatMsg{})
+	m = next.(Model)
+	if m.cloudOps != 0 {
+		t.Fatalf("heartbeat with modal open should not refresh: cloudOps=%d", m.cloudOps)
+	}
+}
+
+// TestRefreshKeyBypassesWindowButRespectsCloudOps verifies manual `r` ignores the
+// rate-limit window yet is still blocked while a cloud op is in flight.
+func TestRefreshKeyBypassesWindowButRespectsCloudOps(t *testing.T) {
+	t.Parallel()
+	m := loadedModel(&statusRepository{})
+	m.lastSync = time.Now() // fresh: auto-refresh would be blocked
+
+	next, _ := m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	m = next.(Model)
+	if m.cloudOps != 1 {
+		t.Fatalf("manual refresh should bypass the window: cloudOps=%d", m.cloudOps)
+	}
+
+	next, _ = m.Update(tea.KeyPressMsg{Code: 'r', Text: "r"})
+	m = next.(Model)
+	if m.cloudOps != 1 {
+		t.Fatalf("manual refresh during a cloud op should be blocked: cloudOps=%d", m.cloudOps)
+	}
+}
+
+// TestSyncedLoadUpdatesLastSyncAndPreservesCursor verifies a server sync records
+// its time and a quiet refresh keeps the selected row.
+func TestSyncedLoadUpdatesLastSyncAndPreservesCursor(t *testing.T) {
+	t.Parallel()
+	m := NewModel(&statusRepository{})
+	m.cloudOps = 1
+	m.list.SetItems(todoItems([]domain.Todo{
+		{ID: "a"}, {ID: "b"}, {ID: "c"}, {ID: "d"},
+	}))
+	m.list.Select(2)
+
+	next, _ := m.Update(todosLoadedMsg{
+		list:   domain.ListToday,
+		todos:  []domain.Todo{{ID: "a"}, {ID: "b"}, {ID: "c"}, {ID: "d"}},
+		synced: true,
+	})
+	m = next.(Model)
+
+	if m.lastSync.IsZero() {
+		t.Fatal("synced load did not record lastSync")
+	}
+	if m.list.Index() != 2 {
+		t.Fatalf("cursor = %d, want preserved at 2", m.list.Index())
+	}
+}
+
+// TestUnsyncedLoadLeavesLastSync verifies a local reload does not move the window.
+func TestUnsyncedLoadLeavesLastSync(t *testing.T) {
+	t.Parallel()
+	m := NewModel(&statusRepository{})
+	m.cloudOps = 1
+	was := time.Now().Add(-time.Minute)
+	m.lastSync = was
+
+	next, _ := m.Update(todosLoadedMsg{list: domain.ListToday, synced: false})
+	m = next.(Model)
+	if !m.lastSync.Equal(was) {
+		t.Fatalf("lastSync changed on unsynced load: %v != %v", m.lastSync, was)
+	}
+}
+
+// TestViewEnablesFocusReporting verifies focus events are requested from the terminal.
+func TestViewEnablesFocusReporting(t *testing.T) {
+	t.Parallel()
+	if !NewModel(&statusRepository{}).View().ReportFocus {
+		t.Fatal("View should enable ReportFocus")
+	}
+}
