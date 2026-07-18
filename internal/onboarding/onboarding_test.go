@@ -126,6 +126,27 @@ func TestOnboardingTabCyclesFocus(t *testing.T) {
 	}
 }
 
+// TestOnboardingPasteFillsFocusedField verifies pasted text lands in whichever
+// field currently has focus.
+func TestOnboardingPasteFillsFocusedField(t *testing.T) {
+	t.Parallel()
+	m := newModel(testDeps(nil, nil, nil, nil, nil))
+
+	tm, _ := m.Update(tea.PasteMsg{Content: "u@example.com"})
+	m = tm.(model)
+	if got := m.username.Value(); got != "u@example.com" {
+		t.Fatalf("username after paste = %q", got)
+	}
+
+	tm, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyTab})
+	m = tm.(model)
+	tm, _ = m.Update(tea.PasteMsg{Content: "hunter2"})
+	m = tm.(model)
+	if got := m.password.Value(); got != "hunter2" {
+		t.Fatalf("password after paste = %q", got)
+	}
+}
+
 // TestOnboardingViewRenders verifies the modal composites over the background
 // without panicking and shows the key elements.
 func TestOnboardingViewRenders(t *testing.T) {

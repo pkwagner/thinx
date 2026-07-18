@@ -40,6 +40,20 @@ func TestClearDeadlineShortcut(t *testing.T) {
 	}
 }
 
+// TestPasteFillsTitleInput verifies pasted text lands in the title field while editing.
+func TestPasteFillsTitleInput(t *testing.T) {
+	t.Parallel()
+	m := New(domain.Todo{}, 100, 30)
+	_, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter}) // enters title edit
+	if m.editing != fieldTitle {
+		t.Fatalf("editing = %v, want fieldTitle", m.editing)
+	}
+	_, _ = m.Update(tea.PasteMsg{Content: "Pasted title"})
+	if got := m.titleInput.Value(); got != "Pasted title" {
+		t.Fatalf("title after paste = %q", got)
+	}
+}
+
 // TestNormalLegendGroupsEditScheduleAndClear verifies the revised shortcuts.
 func TestNormalLegendGroupsEditScheduleAndClear(t *testing.T) {
 	t.Parallel()

@@ -122,6 +122,11 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, cmd
 		}
 		return m, tea.Quit
+	case tea.PasteMsg:
+		if m.phase != phaseForm {
+			return m, nil // ignore input while verifying or syncing
+		}
+		return m.updateFocused(msg)
 	case tea.KeyPressMsg:
 		if key.Matches(msg, m.keys.quit) {
 			return m, tea.Quit
@@ -129,25 +134,27 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if m.phase != phaseForm {
 			return m, nil // ignore input while verifying or syncing
 		}
-		return m.handleFormInput(msg)
+
+		switch {
+		case key.Matches(msg, m.keys.submit):
+			return m.submit()
+		case key.Matches(msg, m.keys.next):
+			m.focus = (m.focus + 1) % focusCount
+			cmd := m.applyFocus()
+			return m, cmd
+		case key.Matches(msg, m.keys.prev):
+			m.focus = (m.focus + focusCount - 1) % focusCount
+			cmd := m.applyFocus()
+			return m, cmd
+		default:
+			return m.updateFocused(msg)
+		}
 	}
 	return m, nil
 }
 
-func (m model) handleFormInput(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
-	switch {
-	case key.Matches(msg, m.keys.submit):
-		return m.submit()
-	case key.Matches(msg, m.keys.next):
-		m.focus = (m.focus + 1) % focusCount
-		cmd := m.applyFocus()
-		return m, cmd
-	case key.Matches(msg, m.keys.prev):
-		m.focus = (m.focus + focusCount - 1) % focusCount
-		cmd := m.applyFocus()
-		return m, cmd
-	}
-
+// updateFocused forwards msg (a key press or paste) to whichever field is focused.
+func (m model) updateFocused(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
 	switch m.focus {
 	case focusUsername:

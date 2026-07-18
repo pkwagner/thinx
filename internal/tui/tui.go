@@ -160,6 +160,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.list.Select(min(index, len(msg.todos)-1))
 		}
 		return m, cmd
+	case tea.PasteMsg:
+		if m.modal != nil {
+			return m.updateModal(msg)
+		}
+		return m, nil
 	case tea.KeyPressMsg:
 		if m.modal != nil {
 			return m.updateModal(msg)
@@ -307,7 +312,7 @@ func (m Model) openModal() Model {
 	return m
 }
 
-func (m Model) updateModal(msg tea.KeyPressMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateModal(msg tea.Msg) (tea.Model, tea.Cmd) {
 	openModal := m.modal
 	nextModal, cmd := openModal.Update(msg)
 	m.modal = nextModal

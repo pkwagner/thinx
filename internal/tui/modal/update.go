@@ -11,19 +11,36 @@ import (
 	"thinx/internal/tui/uihelp"
 )
 
-// Update applies a key press and returns the updated modal, or nil when it should close.
-func (m *Model) Update(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
-	switch m.editing {
-	case fieldNone:
-		return m.updateNormal(msg)
-	case fieldTitle:
-		return m.updateTitleEdit(msg)
-	case fieldScheduled:
-		return m.updateDateEdit(msg, &m.scheduledInput)
-	case fieldDeadline:
-		return m.updateDateEdit(msg, &m.deadlineInput)
-	case fieldNote:
-		return m.updateNoteEdit(msg)
+// Update applies a key press or paste and returns the updated modal, or nil
+// when it should close.
+func (m *Model) Update(msg tea.Msg) (*Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.PasteMsg:
+		var cmd tea.Cmd
+		switch m.editing {
+		case fieldTitle:
+			m.titleInput, cmd = m.titleInput.Update(msg)
+		case fieldScheduled:
+			m.scheduledInput, cmd = m.scheduledInput.Update(msg)
+		case fieldDeadline:
+			m.deadlineInput, cmd = m.deadlineInput.Update(msg)
+		case fieldNote:
+			m.noteInput, cmd = m.noteInput.Update(msg)
+		}
+		return m, cmd
+	case tea.KeyPressMsg:
+		switch m.editing {
+		case fieldNone:
+			return m.updateNormal(msg)
+		case fieldTitle:
+			return m.updateTitleEdit(msg)
+		case fieldScheduled:
+			return m.updateDateEdit(msg, &m.scheduledInput)
+		case fieldDeadline:
+			return m.updateDateEdit(msg, &m.deadlineInput)
+		case fieldNote:
+			return m.updateNoteEdit(msg)
+		}
 	}
 	return m, nil
 }
