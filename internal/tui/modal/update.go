@@ -7,8 +7,8 @@ import (
 	"charm.land/bubbles/v2/key"
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
-	"thinx/internal/domain"
-	"thinx/internal/tui/uihelp"
+	"github.com/pkwagner/thinx/internal/domain"
+	"github.com/pkwagner/thinx/internal/tui/uihelp"
 )
 
 // Update applies a key press or paste and returns the updated modal, or nil

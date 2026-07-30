@@ -5,8 +5,8 @@ import (
 
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/lipgloss/v2"
-	"thinx/internal/domain"
-	"thinx/internal/tui/uihelp"
+	"github.com/pkwagner/thinx/internal/domain"
+	"github.com/pkwagner/thinx/internal/tui/uihelp"
 )
 
 // dateInputView renders a date input, styling the text red when the value is not a valid date.

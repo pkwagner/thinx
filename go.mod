@@ -1,4 +1,4 @@
-module thinx
+module github.com/pkwagner/thinx
 
 go 1.25.0
 
@@ -6,7 +6,7 @@ require (
 	charm.land/bubbles/v2 v2.1.0
 	charm.land/bubbletea/v2 v2.0.7
 	charm.land/lipgloss/v2 v2.0.4
-	github.com/arthursoares/things-cloud-sdk v0.0.0
+	github.com/pkwagner/things-cloud-sdk v0.0.0-20260730221026-ffa72e9d0479
 )
 
 require (
@@ -38,5 +38,3 @@ require (
 	modernc.org/memory v1.11.0 // indirect
 	modernc.org/sqlite v1.45.0 // indirect
 )
-
-replace github.com/arthursoares/things-cloud-sdk => github.com/pkwagner/things-cloud-sdk v0.0.0-20260727154414-ce3ecee7d047

@@ -3,7 +3,7 @@ package thingscloud
 import (
 	"errors"
 
-	things "github.com/arthursoares/things-cloud-sdk"
+	things "github.com/pkwagner/things-cloud-sdk"
 )
 
 // ErrInvalidCredentials is returned by Verify when the username/password pair is

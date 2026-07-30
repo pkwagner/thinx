@@ -8,7 +8,7 @@ import (
 	"time"
 
 	tea "charm.land/bubbletea/v2"
-	"thinx/internal/domain"
+	"github.com/pkwagner/thinx/internal/domain"
 )
 
 type statusRepository struct {
