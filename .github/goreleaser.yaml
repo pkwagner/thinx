@@ -1,0 +1,35 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+version: 2
+
+project_name: thinx
+
+builds:
+  - id: thinx
+    main: ./cmd/thinx
+    binary: thinx
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+
+archives:
+  - id: thinx
+    ids:
+      - thinx
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats:
+      - binary
+
+checksum:
+  disable: true
+
+changelog:
+  sort: asc
+
+release:
+  prerelease: auto
