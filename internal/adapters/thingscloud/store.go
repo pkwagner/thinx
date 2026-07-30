@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"sync"
 
-	things "github.com/arthursoares/things-cloud-sdk"
-	thingssync "github.com/arthursoares/things-cloud-sdk/sync"
-	"thinx/internal/domain"
+	things "github.com/pkwagner/things-cloud-sdk"
+	thingssync "github.com/pkwagner/things-cloud-sdk/sync"
+	"github.com/pkwagner/thinx/internal/domain"
 )
 
 type Store struct {

@@ -48,8 +48,8 @@ github.com/muesli/cancelreader v0.2.2 h1:3I4Kt4BQjOR54NavqnDogx/MIoWBFa0StPA8ELU
 github.com/muesli/cancelreader v0.2.2/go.mod h1:3XuTXfFS2VjM+HTLZY9Ak0l6eUKfijIfMUZ4EgX0QYo=
 github.com/ncruces/go-strftime v1.0.0 h1:HMFp8mLCTPp341M/ZnA4qaf7ZlsbTc+miZjCLOFAw7w=
 github.com/ncruces/go-strftime v1.0.0/go.mod h1:Fwc5htZGVVkseilnfgOVb9mKy6w1naJmn9CehxcKcls=
-github.com/pkwagner/things-cloud-sdk v0.0.0-20260727154414-ce3ecee7d047 h1:P8/l9Zx9t2K7PUukKFOE2OjH+ITo4t4uLMDweRQpC8U=
-github.com/pkwagner/things-cloud-sdk v0.0.0-20260727154414-ce3ecee7d047/go.mod h1:avPdpmFkGy4vIADc3dubOFcW+gU8S49QGfZm6pOU+5M=
+github.com/pkwagner/things-cloud-sdk v0.0.0-20260730221026-ffa72e9d0479 h1:haHnc/QqfTVmrVxIkEOkI5827KSEj32xq+xs2rn9zsM=
+github.com/pkwagner/things-cloud-sdk v0.0.0-20260730221026-ffa72e9d0479/go.mod h1:z/1kUSaOasdyOE//OzNPsA8AIrrD9HPdj2rMRIt+nCA=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec h1:W09IVJc94icq4NjY3clb7Lk8O1qJ8BdBEF8z0ibU0rE=
 github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec/go.mod h1:qqbHyh8v60DhA7CoWK5oRCqLrMHRGoxYCSS9EjAz6Eo=
 github.com/rivo/uniseg v0.4.7 h1:WUdvkW8uEhrYfLC4ZzdpI2ztxP1I582+49Oc5Mq64VQ=

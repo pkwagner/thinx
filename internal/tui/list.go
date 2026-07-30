@@ -8,8 +8,8 @@ import (
 	"charm.land/bubbles/v2/list"
 	tea "charm.land/bubbletea/v2"
 	"charm.land/lipgloss/v2"
-	"thinx/internal/domain"
-	"thinx/internal/tui/uihelp"
+	"github.com/pkwagner/thinx/internal/domain"
+	"github.com/pkwagner/thinx/internal/tui/uihelp"
 )
 
 type todoDelegate struct {
