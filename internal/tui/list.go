@@ -92,8 +92,10 @@ func todoItems(todos []domain.Todo) []list.Item {
 
 func todoDetails(todo domain.Todo, list domain.TodoList) string {
 	details := []string{}
-	if list != domain.ListInbox && todo.Project != "" {
-		details = append(details, "#"+todo.Project)
+	if list != domain.ListInbox {
+		for _, name := range todo.Project {
+			details = append(details, "#"+name)
+		}
 	}
 	if todo.DeadlineAt != nil {
 		details = append(details, "!"+uihelp.FormatDate(*todo.DeadlineAt))

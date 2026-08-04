@@ -51,7 +51,7 @@ func (m *Model) header() string {
 // fields renders the labelled task details, varying by status.
 func (m *Model) fields() string {
 	rows := []string{
-		m.row("Project", orDash(m.todo.Project), ""),
+		m.row("Project", orDash(strings.Join(m.todo.Project, " › ")), ""),
 	}
 
 	switch m.todo.Status {

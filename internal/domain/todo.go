@@ -31,7 +31,7 @@ type Todo struct {
 	Title       string
 	Status      TodoStatus
 	Schedule    TodoSchedule
-	Project     string
+	Project     []string
 	Note        string
 	Checklist   []ChecklistItem
 	ScheduledAt *time.Time

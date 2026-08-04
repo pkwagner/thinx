@@ -68,7 +68,7 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 		return nil, errors.Join(syncErr, err)
 	}
 
-	projectTitlesCache := map[string]string{}
+	ancestorsCache := map[string][]string{}
 	todos := make([]domain.Todo, 0, len(tasks))
 	for _, task := range tasks {
 		if err := ctx.Err(); err != nil {
@@ -77,7 +77,7 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 		if task == nil {
 			continue
 		}
-		project, err := projectTitle(state, projectTitlesCache, task)
+		ancestors, err := taskAncestors(state, ancestorsCache, task)
 		if err != nil {
 			return nil, errors.Join(syncErr, err)
 		}
@@ -92,7 +92,7 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 			Title:       task.Title,
 			Status:      mapStatus(task.Status),
 			Schedule:    mapSchedule(task.Schedule),
-			Project:     project,
+			Project:     ancestors,
 			Note:        task.Note,
 			Checklist:   checklist,
 			ScheduledAt: task.ScheduledDate,
@@ -218,18 +218,56 @@ func mapStatus(s things.TaskStatus) domain.TodoStatus {
 	}
 }
 
-func projectTitle(state *thingssync.State, cache map[string]string, task *things.Task) (string, error) {
-	if len(task.ParentTaskIDs) == 0 || task.ParentTaskIDs[0] == "" {
-		return "", nil
+// maxAncestorDepth bounds the walk up the project tree so a malformed parent
+// chain cannot loop forever.
+const maxAncestorDepth = 8
+
+// taskLookup resolves a task, project or heading by UUID; *thingssync.State
+// implements it.
+type taskLookup interface {
+	Task(uuid string) (*things.Task, error)
+}
+
+// taskAncestors returns the titles of the containers a task sits in, outermost
+// first — typically the project, then any heading. Things links a to-do either
+// straight to a project ("pr") or to a heading ("agr"), never both, and the
+// heading in turn carries the project, so the chain has to be walked rather than
+// read from a single field. The cache is keyed by the first parent, since many
+// tasks share one heading.
+func taskAncestors(state taskLookup, cache map[string][]string, task *things.Task) ([]string, error) {
+	parentID := parentOf(task)
+	if parentID == "" {
+		return nil, nil
 	}
-	projectID := task.ParentTaskIDs[0]
-	if title, ok := cache[projectID]; ok {
-		return title, nil
+	if titles, ok := cache[parentID]; ok {
+		return titles, nil
 	}
-	project, err := state.Task(projectID)
-	if err != nil || project == nil {
-		return "", err
+
+	var titles []string
+	for id, depth := parentID, 0; id != "" && depth < maxAncestorDepth; depth++ {
+		parent, err := state.Task(id)
+		if err != nil {
+			return nil, err
+		}
+		if parent == nil {
+			break
+		}
+		titles = append([]string{parent.Title}, titles...) // outermost ends up first
+		id = parentOf(parent)
 	}
-	cache[projectID] = project.Title
-	return project.Title, nil
+
+	cache[parentID] = titles
+	return titles, nil
+}
+
+// parentOf returns the container a task belongs to: its heading when it has one,
+// otherwise its project. Projects sit in areas, which are not part of this chain.
+func parentOf(task *things.Task) string {
+	if len(task.ActionGroupIDs) > 0 && task.ActionGroupIDs[0] != "" {
+		return task.ActionGroupIDs[0]
+	}
+	if len(task.ParentTaskIDs) > 0 && task.ParentTaskIDs[0] != "" {
+		return task.ParentTaskIDs[0]
+	}
+	return ""
 }

@@ -11,7 +11,7 @@ func TestTodoSameEditableFields(t *testing.T) {
 	date := time.Date(2026, 6, 22, 0, 0, 0, 0, time.UTC)
 	todo := Todo{Title: "Title", Note: "Note", Schedule: TodoScheduleAnytime, ScheduledAt: &date}
 	copy := todo
-	copy.Project = "Ignored"
+	copy.Project = []string{"Ignored"}
 	if !todo.SameEditableFields(copy) {
 		t.Fatal("non-editable project changed comparison")
 	}
