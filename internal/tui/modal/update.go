@@ -132,7 +132,7 @@ func (m *Model) updateDateEdit(msg tea.KeyPressMsg, input *textinput.Model) (*Mo
 	case key.Matches(msg, m.keys.save):
 		var t *time.Time
 		if val := strings.TrimSpace(input.Value()); val != "" {
-			parsed, err := time.ParseInLocation("2006-01-02", val, time.Local)
+			parsed, err := time.Parse("2006-01-02", val)
 			if err != nil {
 				return m, nil // stay editing; red text signals error
 			}
