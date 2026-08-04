@@ -62,8 +62,7 @@ func (m *Model) updateNormal(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 	if m.todo.Status == domain.TodoStatusOpen {
 		switch {
 		case key.Matches(msg, m.keys.scheduleToday):
-			now := time.Now()
-			today := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.Local)
+			today := todayDate()
 			m.todo.Schedule = domain.TodoScheduleAnytime
 			m.todo.ScheduledAt = &today
 			return m, nil
@@ -84,8 +83,10 @@ func (m *Model) updateNormal(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 			return m, nil
 		case key.Matches(msg, m.keys.editScheduled):
 			m.editing = fieldScheduled
-			if m.todo.ScheduledAt != nil {
-				m.scheduledInput.SetValue(uihelp.FormatDate(*m.todo.ScheduledAt))
+			// Start from the date the field displays, so a carried-over task is
+			// edited from today rather than from its original, now past day.
+			if scheduled := effectiveScheduled(m.todo.Schedule, m.todo.ScheduledAt); scheduled != nil {
+				m.scheduledInput.SetValue(uihelp.FormatDate(*scheduled))
 			} else {
 				m.scheduledInput.SetValue("")
 			}
@@ -142,8 +143,8 @@ func (m *Model) updateDateEdit(msg tea.KeyPressMsg, input *textinput.Model) (*Mo
 			m.todo.ScheduledAt = t
 			if t == nil {
 				m.todo.Schedule = domain.TodoScheduleSomeday
-			} else if m.todo.Schedule == domain.TodoScheduleInbox {
-				m.todo.Schedule = domain.TodoScheduleAnytime
+			} else {
+				m.todo.Schedule = scheduleForDate(*t)
 			}
 		case fieldDeadline:
 			m.todo.DeadlineAt = t
