@@ -23,10 +23,11 @@ type tab struct {
 }
 
 type todosLoadedMsg struct {
-	list   domain.TodoList
-	todos  []domain.Todo
-	synced bool // the load performed a server sync (forceSync)
-	err    error
+	list     domain.TodoList
+	todos    []domain.Todo
+	synced   bool   // the load performed a server sync (forceSync)
+	selectID string // if set, highlight this todo after loading (e.g. a new one)
+	err      error
 }
 
 // heartbeatMsg fires on the periodic timer that drives idle auto-refresh.
@@ -124,7 +125,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		index := m.list.Index()
 		cmd := m.list.SetItems(todoItems(msg.todos))
 		if len(msg.todos) > 0 {
-			m.list.Select(min(index, len(msg.todos)-1))
+			target := min(index, len(msg.todos)-1)
+			if msg.selectID != "" {
+				// Highlight a specific todo (e.g. one just created) if present.
+				for i, todo := range msg.todos {
+					if todo.ID == msg.selectID {
+						target = i
+						break
+					}
+				}
+			}
+			m.list.Select(target)
 		}
 		return m, cmd
 	case tea.FocusMsg:
