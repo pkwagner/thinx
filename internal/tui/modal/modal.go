@@ -4,6 +4,7 @@ package modal
 import (
 	"charm.land/bubbles/v2/textarea"
 	"charm.land/bubbles/v2/textinput"
+	tea "charm.land/bubbletea/v2"
 	"thinx/internal/domain"
 )
 
@@ -30,6 +31,7 @@ type Model struct {
 	todo           domain.Todo
 	keys           keyMap
 	editing        field
+	creating       bool
 	titleInput     textinput.Model
 	scheduledInput textinput.Model
 	deadlineInput  textinput.Model
@@ -43,6 +45,7 @@ func New(todo domain.Todo, width, height int) *Model {
 	title := textinput.New()
 	title.Prompt = ""
 	title.CharLimit = 200
+	title.Placeholder = "Title"
 
 	note := textarea.New()
 	note.Prompt = ""
@@ -71,6 +74,16 @@ func newDateInput() textinput.Model {
 
 // Todo returns the (possibly edited) task.
 func (m *Model) Todo() domain.Todo { return m.todo }
+
+// BeginCreate switches the modal into create mode and immediately focuses the
+// title field, so the user can type a new todo's title without any extra keypress.
+func (m *Model) BeginCreate() tea.Cmd {
+	m.creating = true
+	m.editing = fieldTitle
+	m.titleInput.SetValue(m.todo.Title)
+	m.titleInput.CursorEnd()
+	return m.titleInput.Focus()
+}
 
 // SetSize stores the terminal size and reflows all inputs.
 func (m *Model) SetSize(width, height int) {

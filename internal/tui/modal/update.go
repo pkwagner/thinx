@@ -109,11 +109,18 @@ func (m *Model) updateNormal(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 func (m *Model) updateTitleEdit(msg tea.KeyPressMsg) (*Model, tea.Cmd) {
 	switch {
 	case key.Matches(msg, m.keys.save):
-		m.todo.Title = strings.TrimSpace(m.titleInput.Value())
+		title := strings.TrimSpace(m.titleInput.Value())
+		if title == "" {
+			return m, nil // empty titles are not allowed; stay editing (esc to leave)
+		}
+		m.todo.Title = title
 		m.editing = fieldNone
 		m.titleInput.Blur()
 		return m, nil
 	case key.Matches(msg, m.keys.cancel):
+		if m.creating {
+			return nil, nil // esc aborts a new, unsaved todo outright
+		}
 		m.editing = fieldNone
 		m.titleInput.Blur()
 		return m, nil

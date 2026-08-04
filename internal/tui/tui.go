@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"strings"
 	"time"
 
 	"charm.land/bubbles/v2/key"
@@ -10,6 +11,7 @@ import (
 	"charm.land/lipgloss/v2"
 	"thinx/internal/domain"
 	"thinx/internal/tui/modal"
+	"thinx/internal/tui/uihelp"
 )
 
 // autoRefreshInterval is the minimum time between server syncs and the period of
@@ -50,6 +52,7 @@ type Model struct {
 	spinner       spinner.Model
 	modal         *modal.Model
 	modalOriginal domain.Todo
+	modalCreating bool // the open modal is composing a new todo, not editing one
 	active        int
 	cloudOps      int
 	err           error
@@ -186,6 +189,8 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case key.Matches(msg, m.keys.openTask):
 			return m.openModal(), nil
+		case key.Matches(msg, m.keys.newTodo):
+			return m.openCreateModal()
 		case key.Matches(msg, m.keys.completeTodo):
 			status := domain.TodoStatusCompleted
 			if m.tabs[m.active].list == domain.ListLogbook {
@@ -323,6 +328,45 @@ func (m Model) openModal() Model {
 	return m
 }
 
+// openCreateModal opens the shared modal on a blank todo prefilled for the active
+// tab, with the title field focused. Creation is disabled in the Archive.
+func (m Model) openCreateModal() (tea.Model, tea.Cmd) {
+	list := m.tabs[m.active].list
+	if list == domain.ListLogbook {
+		return m, nil
+	}
+	m.modal = modal.New(m.newTodoForList(list), m.width, m.height)
+	m.modalCreating = true
+	return m, m.modal.BeginCreate()
+}
+
+// newTodoForList builds a blank todo with schedule/date prefilled from the tab:
+// Inbox/Today/Anytime/Someday map to their schedule; Scheduled copies the hovered
+// todo's date (or tomorrow when the list is empty).
+func (m Model) newTodoForList(list domain.TodoList) domain.Todo {
+	todo := domain.Todo{Status: domain.TodoStatusOpen}
+	switch list {
+	case domain.ListInbox:
+		todo.Schedule = domain.TodoScheduleInbox
+	case domain.ListToday:
+		today := uihelp.TodayDate()
+		todo.Schedule = domain.TodoScheduleAnytime
+		todo.ScheduledAt = &today
+	case domain.ListSomeday:
+		todo.Schedule = domain.TodoScheduleSomeday
+	case domain.ListScheduled:
+		todo.Schedule = domain.TodoScheduleSomeday
+		when := uihelp.TodayDate().AddDate(0, 0, 1)
+		if hovered, ok := m.list.SelectedItem().(domain.Todo); ok && hovered.ScheduledAt != nil {
+			when = *hovered.ScheduledAt
+		}
+		todo.ScheduledAt = &when
+	default: // ListAnytime
+		todo.Schedule = domain.TodoScheduleAnytime
+	}
+	return todo
+}
+
 func (m Model) updateModal(msg tea.Msg) (tea.Model, tea.Cmd) {
 	openModal := m.modal
 	nextModal, cmd := openModal.Update(msg)
@@ -331,11 +375,23 @@ func (m Model) updateModal(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, cmd
 	}
 
-	// The modal closed: if anything changed, write the edited row into the list
-	// and persist, then reload so the list's membership reflects the new
-	// schedule/status per Things' own rules.
-	before := m.modalOriginal
 	current := openModal.Todo()
+
+	// The modal closed while creating: persist the new todo unless it was left
+	// without a title (an aborted create), then reload so it lands in place.
+	if m.modalCreating {
+		m.modalCreating = false
+		if strings.TrimSpace(current.Title) == "" {
+			return m, cmd
+		}
+		spinnerCmd := m.beginCloudOperation()
+		return m, tea.Batch(cmd, createAndReload(m.repo, current, m.tabs[m.active].list), spinnerCmd)
+	}
+
+	// The modal closed after an edit: if anything changed, write the edited row
+	// into the list and persist, then reload so the list's membership reflects the
+	// new schedule/status per Things' own rules.
+	before := m.modalOriginal
 	m.modalOriginal = domain.Todo{}
 	if before.SameEditableFields(current) {
 		return m, cmd

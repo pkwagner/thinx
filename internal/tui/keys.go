@@ -15,6 +15,7 @@ type keyMap struct {
 	previousTodo key.Binding
 	nextTodo     key.Binding
 	openTask     key.Binding
+	newTodo      key.Binding
 	completeTodo key.Binding
 	cancelTodo   key.Binding
 	deleteTodo   key.Binding
@@ -29,6 +30,7 @@ func newKeyMap() keyMap {
 		previousTodo: key.NewBinding(key.WithKeys("k", "up"), key.WithHelp("k/↑", "prev todo")),
 		nextTodo:     key.NewBinding(key.WithKeys("j", "down"), key.WithHelp("j/↓", "next todo")),
 		openTask:     key.NewBinding(key.WithKeys("enter"), key.WithHelp("enter", "open")),
+		newTodo:      key.NewBinding(key.WithKeys("n"), key.WithHelp("n", "new")),
 		completeTodo: key.NewBinding(key.WithKeys("c"), key.WithHelp("c", "complete")),
 		cancelTodo:   key.NewBinding(key.WithKeys("C"), key.WithHelp("C", "cancel")),
 		deleteTodo:   key.NewBinding(key.WithKeys("backspace"), key.WithHelp("⌫", "delete")),
@@ -45,10 +47,15 @@ func (k keyMap) legend(list domain.TodoList) string {
 	parts := []string{
 		uihelp.MultiBindingHelp("select", k.previousTodo, k.nextTodo, k.previousList, k.nextList),
 		uihelp.BindingHelp(k.openTask),
+	}
+	if list != domain.ListLogbook { // creation is not offered in the Archive
+		parts = append(parts, uihelp.BindingHelp(k.newTodo))
+	}
+	parts = append(parts,
 		checkHelp,
 		uihelp.BindingHelp(k.deleteTodo),
 		uihelp.BindingHelp(k.refresh),
 		uihelp.BindingHelp(k.quit),
-	}
+	)
 	return strings.Join(parts, "; ")
 }

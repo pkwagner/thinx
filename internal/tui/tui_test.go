@@ -17,7 +17,17 @@ type statusRepository struct {
 	deleted      string
 	updateBefore domain.Todo
 	updateAfter  domain.Todo
+	created      domain.Todo
 	err          error
+}
+
+// Create records the requested new todo.
+func (r *statusRepository) Create(_ context.Context, todo domain.Todo) (domain.Todo, error) {
+	r.created = todo
+	if todo.ID == "" {
+		todo.ID = "created-id"
+	}
+	return todo, r.err
 }
 
 // Update records the requested task edit.
@@ -476,5 +486,181 @@ func TestViewEnablesFocusReporting(t *testing.T) {
 	t.Parallel()
 	if !NewModel(&statusRepository{}).View().ReportFocus {
 		t.Fatal("View should enable ReportFocus")
+	}
+}
+
+// TestNewTodoForListPrefills verifies tab-based prefill of a new todo.
+func TestNewTodoForListPrefills(t *testing.T) {
+	t.Parallel()
+	m := NewModel(&statusRepository{})
+	cases := []struct {
+		list     domain.TodoList
+		schedule domain.TodoSchedule
+		hasDate  bool
+	}{
+		{domain.ListInbox, domain.TodoScheduleInbox, false},
+		{domain.ListToday, domain.TodoScheduleAnytime, true},
+		{domain.ListAnytime, domain.TodoScheduleAnytime, false},
+		{domain.ListSomeday, domain.TodoScheduleSomeday, false},
+		{domain.ListScheduled, domain.TodoScheduleSomeday, true}, // empty list -> tomorrow
+	}
+	for _, tc := range cases {
+		todo := m.newTodoForList(tc.list)
+		if todo.Schedule != tc.schedule {
+			t.Errorf("list %v: schedule=%v want %v", tc.list, todo.Schedule, tc.schedule)
+		}
+		if (todo.ScheduledAt != nil) != tc.hasDate {
+			t.Errorf("list %v: hasDate=%v want %v", tc.list, todo.ScheduledAt != nil, tc.hasDate)
+		}
+	}
+}
+
+// TestNewTodoForScheduledCopiesHoveredDate verifies the Scheduled tab copies the
+// hovered todo's scheduled date.
+func TestNewTodoForScheduledCopiesHoveredDate(t *testing.T) {
+	t.Parallel()
+	m := NewModel(&statusRepository{})
+	when := time.Date(2026, 8, 1, 0, 0, 0, 0, time.Local)
+	m.list.SetItems(todoItems([]domain.Todo{{ID: "a", Title: "A", ScheduledAt: &when}}))
+	m.list.Select(0)
+
+	todo := m.newTodoForList(domain.ListScheduled)
+	if todo.ScheduledAt == nil || !todo.ScheduledAt.Equal(when) {
+		t.Fatalf("scheduled date = %v, want copied %v", todo.ScheduledAt, when)
+	}
+}
+
+// TestCreateModalDisabledInArchive verifies "n" does nothing in the Logbook.
+func TestCreateModalDisabledInArchive(t *testing.T) {
+	t.Parallel()
+	m := NewModel(&statusRepository{})
+	m.width, m.height = 100, 30
+	for i, tab := range m.tabs {
+		if tab.list == domain.ListLogbook {
+			m.active = i
+		}
+	}
+	next, _ := m.openCreateModal()
+	if next.(Model).modal != nil {
+		t.Fatal("create modal must not open in the Archive")
+	}
+}
+
+// TestCreateModalSavesNonEmptyOnClose verifies a titled new todo persists on close.
+func TestCreateModalSavesNonEmptyOnClose(t *testing.T) {
+	t.Parallel()
+	repo := &statusRepository{}
+	m := NewModel(repo)
+	m.width, m.height = 100, 30
+
+	next, _ := m.openCreateModal()
+	m = next.(Model)
+	if m.modal == nil || !m.modalCreating {
+		t.Fatal("create modal not opened")
+	}
+	tm, _ := m.Update(tea.PasteMsg{Content: "Water plants"})
+	m = tm.(Model)
+	tm, _ = m.Update(tea.KeyPressMsg{Code: tea.KeyEnter}) // commit title
+	m = tm.(Model)
+	tm, cmd := m.Update(tea.KeyPressMsg{Code: 'q', Text: "q"}) // close
+	m = tm.(Model)
+
+	if m.modal != nil || m.modalCreating {
+		t.Fatalf("modal should be closed: modal=%v creating=%v", m.modal, m.modalCreating)
+	}
+	if cmd == nil {
+		t.Fatal("closing a titled new todo should schedule a create")
+	}
+}
+
+// TestCreateModalDiscardsEmptyOnClose verifies esc on an untitled new todo aborts.
+func TestCreateModalDiscardsEmptyOnClose(t *testing.T) {
+	t.Parallel()
+	repo := &statusRepository{}
+	m := NewModel(repo)
+	m.width, m.height = 100, 30
+
+	next, _ := m.openCreateModal()
+	m = next.(Model)
+	tm, cmd := m.Update(tea.KeyPressMsg{Code: tea.KeyEscape}) // abort empty
+	m = tm.(Model)
+
+	if m.modal != nil || m.modalCreating {
+		t.Fatal("modal should be closed after esc")
+	}
+	if cmd != nil {
+		cmd() // drain any batched work
+	}
+	if repo.created.Title != "" {
+		t.Fatalf("empty new todo must not persist, got %q", repo.created.Title)
+	}
+}
+
+// TestCreateAndReloadPersistsAndReloads verifies the command creates then reloads.
+func TestCreateAndReloadPersistsAndReloads(t *testing.T) {
+	t.Parallel()
+	repo := &statusRepository{}
+	cmd := createAndReload(repo, domain.Todo{Title: "X", Schedule: domain.TodoScheduleInbox}, domain.ListInbox)
+	msg, ok := cmd().(todosLoadedMsg)
+	if !ok {
+		t.Fatal("createAndReload should return todosLoadedMsg")
+	}
+	if repo.created.Title != "X" {
+		t.Fatalf("repo.Create not called with the new todo, got %q", repo.created.Title)
+	}
+	if msg.list != domain.ListInbox {
+		t.Fatalf("reload list = %v, want Inbox", msg.list)
+	}
+}
+
+// TestTodayHidesScheduledDate verifies the Today list omits the (redundant)
+// scheduled date while Scheduled still shows it.
+func TestTodayHidesScheduledDate(t *testing.T) {
+	t.Parallel()
+	when := time.Now()
+	todo := domain.Todo{Title: "X", ScheduledAt: &when}
+	if strings.Contains(todoDetails(todo, domain.ListToday), "@") {
+		t.Fatalf("Today should not show the scheduled date: %q", todoDetails(todo, domain.ListToday))
+	}
+	if !strings.Contains(todoDetails(todo, domain.ListScheduled), "@") {
+		t.Fatal("Scheduled should still show the scheduled date")
+	}
+}
+
+// TestCreatedTodoIsHighlighted verifies the reload selects a newly created todo
+// via todosLoadedMsg.selectID, rather than preserving the prior cursor.
+func TestCreatedTodoIsHighlighted(t *testing.T) {
+	t.Parallel()
+	m := NewModel(&statusRepository{})
+	m.cloudOps = 1
+	m.list.SetItems(todoItems([]domain.Todo{{ID: "a", Title: "A"}, {ID: "b", Title: "B"}}))
+	m.list.Select(0)
+
+	next, _ := m.Update(todosLoadedMsg{
+		list:     domain.ListToday,
+		todos:    []domain.Todo{{ID: "a", Title: "A"}, {ID: "b", Title: "B"}, {ID: "c", Title: "C"}},
+		selectID: "c",
+	})
+	m = next.(Model)
+	if got := m.list.SelectedItem().(domain.Todo).ID; got != "c" {
+		t.Fatalf("selected todo = %q, want the newly created %q", got, "c")
+	}
+}
+
+// TestTodoDetailsRendersProjectHierarchy verifies each level of the enclosing
+// hierarchy gets its own tag, outermost first, and that Inbox omits them (a
+// todo in the Inbox has no project by definition).
+func TestTodoDetailsRendersProjectHierarchy(t *testing.T) {
+	t.Parallel()
+	todo := domain.Todo{Title: "Schlauch Schreibtisch", Project: []string{"Wohnung einrichten", "🏗️"}}
+
+	if got, want := todoDetails(todo, domain.ListAnytime), "#Wohnung einrichten #🏗️"; got != want {
+		t.Fatalf("details = %q, want %q", got, want)
+	}
+	if got := todoDetails(todo, domain.ListInbox); strings.Contains(got, "#") {
+		t.Fatalf("Inbox should not show the hierarchy, got %q", got)
+	}
+	if got := todoDetails(domain.Todo{Title: "Loose"}, domain.ListAnytime); got != "" {
+		t.Fatalf("a todo without a project should have no tags, got %q", got)
 	}
 }

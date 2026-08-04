@@ -103,6 +103,28 @@ func (s *Store) List(ctx context.Context, filter domain.TodoFilter, forceSync bo
 	return todos, syncErr
 }
 
+// Create persists a new todo to Things Cloud and returns it with its assigned ID.
+func (s *Store) Create(ctx context.Context, todo domain.Todo) (domain.Todo, error) {
+	if err := ctx.Err(); err != nil {
+		return domain.Todo{}, err
+	}
+
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	task, err := s.syncer.CreateTask(
+		todo.Title,
+		mapDomainSchedule(todo.Schedule),
+		todo.ScheduledAt,
+		todo.DeadlineAt,
+		todo.Note,
+	)
+	if err != nil {
+		return domain.Todo{}, err
+	}
+	todo.ID = task.UUID
+	return todo, nil
+}
+
 // Update persists changed modal-editable fields to Things Cloud.
 func (s *Store) Update(ctx context.Context, before, after domain.Todo) error {
 	if err := ctx.Err(); err != nil {

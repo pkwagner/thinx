@@ -57,6 +57,16 @@ func mutateAndReload(repo domain.TodoRepository, id string, list domain.TodoList
 	}
 }
 
+// createAndReload persists a new todo and then reloads the list so it appears in
+// the right place, mirroring saveAndReload's reload-based reconciliation.
+func createAndReload(repo domain.TodoRepository, todo domain.Todo, list domain.TodoList) tea.Cmd {
+	return func() tea.Msg {
+		created, createErr := repo.Create(context.Background(), todo)
+		todos, listErr := repo.List(context.Background(), domain.TodoFilter{List: list}, false)
+		return todosLoadedMsg{list: list, todos: todos, selectID: created.ID, err: errors.Join(createErr, listErr)}
+	}
+}
+
 // saveAndReload persists modal edits and then reloads the list, so its
 // membership reflects the new schedule and status without reimplementing
 // Things' placement rules in the TUI.
