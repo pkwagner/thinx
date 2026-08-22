@@ -1,5 +1,5 @@
-# thinx
-thinx is a Things Cloud-compatible todo app for the terminal, running on Linux, macOS, and Windows.
+# Thinx
+Thinx is a Things 3-compatible todo app for the Terminal, running on Linux, macOS, and Windows.
 
 <img src=".github/assets/teaser_edit.png" width="800px" alt="thinx example screenshot"/>
 
@@ -8,7 +8,13 @@ thinx is a Things Cloud-compatible todo app for the terminal, running on Linux, 
 go install github.com/pkwagner/thinx/cmd/thinx@latest
 ```
 
-Alternatively, binaries for Linux, macOS, and Windows are available on the [releases page](https://github.com/pkwagner/thinx/releases). 
+Alternatively, binaries for Linux, macOS, and Windows are available on the [releases page](https://github.com/pkwagner/thinx/releases). Just double-click under Windows, or install on Linux or macOS with:
+
+```sh
+install -Dm755 <path_to_downloaded_binary> ~/.local/bin/thinx
+```
+
+Run with `thinx` from your Terminal afterwards. Make sure that your `PATH` includes either `~/go/bin/` (first method) or `~/.local/bin/` (second method).
 
 ## Features
 - Create, view, and edit todos
