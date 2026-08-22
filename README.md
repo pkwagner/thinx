@@ -1,4 +1,4 @@
-# Thinx
+# thinx
 Thinx is a Things 3-compatible todo app for the Terminal, running on Linux, macOS, and Windows.
 
 <img src=".github/assets/teaser_edit.png" width="800px" alt="thinx example screenshot"/>
