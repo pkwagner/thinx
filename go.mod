@@ -6,7 +6,7 @@ require (
 	charm.land/bubbles/v2 v2.1.0
 	charm.land/bubbletea/v2 v2.0.7
 	charm.land/lipgloss/v2 v2.0.4
-	github.com/pkwagner/things-cloud-sdk v0.0.0-20260730221026-ffa72e9d0479
+	github.com/pkwagner/things-cloud-sdk v0.0.0-20261016111753-041df3fca450
 )
 
 require (
